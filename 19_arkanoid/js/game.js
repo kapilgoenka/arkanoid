@@ -29,6 +29,8 @@ const game = {
 const paddle = new Paddle(canvas.width, canvas.height);
 const balls  = [new Ball(canvas.width / 2, paddle.y - 10)];
 let bricks   = buildLevel(0);
+const powerUps = [];
+const scoreRef = { value: 0 }; // object so collision.js can mutate by reference
 
 function activeBalls() { return balls.filter(b => !b.isLost(canvas.height)); }
 
@@ -40,8 +42,33 @@ function resetBall() {
 function startLevel(levelIndex) {
   game.level = levelIndex + 1;
   bricks = buildLevel(levelIndex);
-  balls.forEach(b => b.setSpeed(LEVEL_SPEEDS[levelIndex] ?? 7.2));
+  powerUps.length = 0;
+  const speed = LEVEL_SPEEDS[levelIndex] ?? 7.2;
+  balls.forEach(b => b.setSpeed(speed));
   resetBall();
+}
+
+function activatePowerUp(type) {
+  if (type === 'expand') {
+    paddle.width = Math.min(paddle.width * 1.5, canvas.width * 0.6);
+    setTimeout(() => { paddle.width = 100; }, 10000);
+  } else if (type === 'multiball') {
+    const ref = balls.find(b => b.launched) || balls[0];
+    [-25, 25].forEach(deg => {
+      const rad = deg * Math.PI / 180;
+      const nb  = new Ball(ref.x, ref.y, ref.radius);
+      nb.launched = true;
+      nb.speed    = ref.speed;
+      nb.vx = ref.vx * Math.cos(rad) - ref.vy * Math.sin(rad);
+      nb.vy = ref.vx * Math.sin(rad) + ref.vy * Math.cos(rad);
+      balls.push(nb);
+    });
+  } else if (type === 'life') {
+    game.lives += 1;
+  } else if (type === 'slow') {
+    balls.forEach(b => b.setSpeed(b.speed * 0.7));
+    setTimeout(() => balls.forEach(b => b.setSpeed(b.speed / 0.7)), 8000);
+  }
 }
 
 canvas.addEventListener('mousemove', (e) => {
@@ -76,11 +103,34 @@ function updatePlaying(dt) {
 
   paddle.update(dt);
   balls.forEach(b => b.update(dt, canvas.width));
+  powerUps.forEach(p => p.update(dt));
 
-  // Remove lost balls; lose a life when the last one exits
+  // Collisions
+  const launchedBalls = balls.filter(b => b.launched);
+  launchedBalls.forEach(b => {
+    checkBrickCollisions(b, bricks, powerUps, scoreRef);
+    checkPaddleCollision(b, paddle);
+  });
+  checkPowerUpCollisions(powerUps, paddle, activatePowerUp);
+  game.score = scoreRef.value;
+
+  // Win check
+  if (allBricksCleared(bricks)) {
+    const nextIndex = game.level; // game.level is 1-based; next level index = current
+    if (nextIndex >= LEVEL_MAPS.length) {
+      game.state = STATES.YOU_WIN;
+    } else {
+      startLevel(nextIndex);
+      game.state = STATES.LEVEL_COMPLETE;
+    }
+    return;
+  }
+
+  // Life loss — remove lost balls
   const alive = activeBalls();
-  if (alive.length === 0) {
+  if (balls.some(b => b.launched) && alive.length === 0) {
     game.lives -= 1;
+    audio.lifeLost();
     if (game.lives <= 0) {
       game.state = STATES.GAME_OVER;
     } else {
@@ -88,8 +138,16 @@ function updatePlaying(dt) {
     }
     return;
   }
+  // Sync balls array to only living balls
+  if (balls.some(b => b.launched)) {
+    balls.length = 0;
+    alive.forEach(b => balls.push(b));
+    if (balls.length === 0) resetBall();
+  }
 
+  // Draw
   bricks.forEach(b => b.draw(ctx));
+  powerUps.filter(p => p.active).forEach(p => p.draw(ctx));
   paddle.draw(ctx);
   balls.forEach(b => b.draw(ctx));
 }
@@ -214,7 +272,10 @@ document.addEventListener('keydown', (e) => {
     game.score = 0;
     game.lives = 3;
     game.level = 1;
-    resetBall();
+    scoreRef.value = 0;
+    powerUps.length = 0;
+    paddle.width = 100;
+    startLevel(0);
     game.state = STATES.TITLE;
   }
   if (e.code === 'KeyH' && game.state === STATES.TITLE) {
