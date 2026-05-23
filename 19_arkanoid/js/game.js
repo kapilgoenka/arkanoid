@@ -24,6 +24,8 @@ const game = {
   lives: 3,
   level: 1,
   lastTime: 0,
+  sessionStart: 0,
+  bricksDestroyed: 0,
 };
 
 const paddle = new Paddle(canvas.width, canvas.height);
@@ -46,6 +48,11 @@ function startLevel(levelIndex) {
   const speed = LEVEL_SPEEDS[levelIndex] ?? 7.2;
   balls.forEach(b => b.setSpeed(speed));
   resetBall();
+}
+
+function saveSession() {
+  const duration = (Date.now() - game.sessionStart) / 1000;
+  history.save(game.score, game.level, game.bricksDestroyed, duration);
 }
 
 function activatePowerUp(type) {
@@ -107,10 +114,12 @@ function updatePlaying(dt) {
 
   // Collisions
   const launchedBalls = balls.filter(b => b.launched);
+  const prevScore = scoreRef.value;
   launchedBalls.forEach(b => {
     checkBrickCollisions(b, bricks, powerUps, scoreRef);
     checkPaddleCollision(b, paddle);
   });
+  game.bricksDestroyed += Math.round((scoreRef.value - prevScore) / 10);
   checkPowerUpCollisions(powerUps, paddle, activatePowerUp);
   game.score = scoreRef.value;
 
@@ -118,9 +127,12 @@ function updatePlaying(dt) {
   if (allBricksCleared(bricks)) {
     const nextIndex = game.level; // game.level is 1-based; next level index = current
     if (nextIndex >= LEVEL_MAPS.length) {
+      saveSession();
+      audio.levelComplete();
       game.state = STATES.YOU_WIN;
     } else {
       startLevel(nextIndex);
+      audio.levelComplete();
       game.state = STATES.LEVEL_COMPLETE;
     }
     return;
@@ -132,6 +144,8 @@ function updatePlaying(dt) {
     game.lives -= 1;
     audio.lifeLost();
     if (game.lives <= 0) {
+      saveSession();
+      audio.gameOver();
       game.state = STATES.GAME_OVER;
     } else {
       resetBall();
@@ -266,18 +280,7 @@ function drawYouWin() {
 }
 
 function drawHistory() {
-  // Populated in KGO-25
-  ctx.fillStyle = '#0a0a1a';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = '#00cfff';
-  ctx.font = 'bold 36px Courier New';
-  ctx.textAlign = 'center';
-  ctx.fillText('MY PROGRESS', canvas.width / 2, 80);
-
-  ctx.fillStyle = '#888';
-  ctx.font = '18px Courier New';
-  ctx.fillText('Press ESC to go back', canvas.width / 2, canvas.height - 40);
+  drawHistoryScreen(ctx, canvas);
 }
 
 canvas.addEventListener('click', () => {
@@ -287,6 +290,8 @@ canvas.addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
     if (game.state === STATES.TITLE) {
+      game.sessionStart = Date.now();
+      game.bricksDestroyed = 0;
       game.state = STATES.PLAYING;
     } else if (game.state === STATES.PLAYING) {
       balls.forEach(b => b.launch());
