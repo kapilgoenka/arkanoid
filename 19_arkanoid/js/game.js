@@ -150,6 +150,31 @@ function updatePlaying(dt) {
   powerUps.filter(p => p.active).forEach(p => p.draw(ctx));
   paddle.draw(ctx);
   balls.forEach(b => b.draw(ctx));
+  drawHUD();
+}
+
+function drawHUD() {
+  ctx.font = 'bold 16px Courier New';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(`Score: ${game.score}`, 10, 20);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#aaaaff';
+  ctx.fillText(`Level ${game.level}`, canvas.width / 2, 20);
+
+  ctx.textAlign = 'right';
+  // Hearts for lives
+  ctx.fillStyle = '#ff4444';
+  ctx.fillText('♥'.repeat(game.lives), canvas.width - 10, 20);
+
+  // Mute indicator
+  if (audio.muted) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#666';
+    ctx.font = '13px Courier New';
+    ctx.fillText('🔇 M', canvas.width - 10, canvas.height - 8);
+  }
 }
 
 function drawTitle() {
@@ -190,11 +215,18 @@ function drawLevelComplete() {
   ctx.fillStyle = '#00ff88';
   ctx.font = 'bold 48px Courier New';
   ctx.textAlign = 'center';
-  ctx.fillText('LEVEL COMPLETE!', canvas.width / 2, canvas.height / 2);
+  ctx.fillText('LEVEL COMPLETE!', canvas.width / 2, canvas.height / 2 - 20);
 
   ctx.fillStyle = '#fff';
-  ctx.font = '20px Courier New';
-  ctx.fillText('Press SPACE for next level', canvas.width / 2, canvas.height / 2 + 60);
+  ctx.font = '22px Courier New';
+  ctx.fillText(`Score: ${game.score}`, canvas.width / 2, canvas.height / 2 + 30);
+
+  ctx.fillStyle = '#aaa';
+  ctx.font = '18px Courier New';
+  ctx.fillText(
+    `Level ${game.level} starting — Press SPACE`,
+    canvas.width / 2, canvas.height / 2 + 70
+  );
 }
 
 function drawGameOver() {
