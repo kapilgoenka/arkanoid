@@ -56,9 +56,10 @@ function saveSession() {
 }
 
 function activatePowerUp(type) {
+  activatePowerUpGlow();
   if (type === 'expand') {
     paddle.width = Math.min(paddle.width * 1.5, canvas.width * 0.6);
-    setTimeout(() => { paddle.width = 100; }, 10000);
+    setTimeout(() => { paddle.width = 100; clearPowerUpGlow(); }, 10000);
   } else if (type === 'multiball') {
     const ref = balls.find(b => b.launched) || balls[0];
     [-25, 25].forEach(deg => {
@@ -109,8 +110,9 @@ function updatePlaying(dt) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   paddle.update(dt);
-  balls.forEach(b => b.update(dt, canvas.width));
+  balls.forEach(b => { b.update(dt, canvas.width); updateTrail(b); });
   powerUps.forEach(p => p.update(dt));
+  updateParticles(dt);
 
   // Collisions
   const launchedBalls = balls.filter(b => b.launched);
@@ -119,7 +121,15 @@ function updatePlaying(dt) {
     checkBrickCollisions(b, bricks, powerUps, scoreRef);
     checkPaddleCollision(b, paddle);
   });
-  game.bricksDestroyed += Math.round((scoreRef.value - prevScore) / 10);
+  const scoreDelta = scoreRef.value - prevScore;
+  game.bricksDestroyed += Math.round(scoreDelta / 10);
+  // Spawn particles at destroyed bricks
+  if (scoreDelta > 0) {
+    bricks.filter(b => b.status === 0 && !b._sparked).forEach(b => {
+      spawnParticles(b.x + b.w / 2, b.y + b.h / 2, b.color, 10);
+      b._sparked = true;
+    });
+  }
   checkPowerUpCollisions(powerUps, paddle, activatePowerUp);
   game.score = scoreRef.value;
 
@@ -161,8 +171,10 @@ function updatePlaying(dt) {
 
   // Draw
   bricks.forEach(b => b.draw(ctx));
+  drawParticles(ctx);
   powerUps.filter(p => p.active).forEach(p => p.draw(ctx));
-  paddle.draw(ctx);
+  drawPaddleWithGlow(ctx, paddle);
+  drawTrail(ctx, balls[0]?.radius ?? 8);
   balls.forEach(b => b.draw(ctx));
   drawHUD();
 }
@@ -189,6 +201,22 @@ function drawHUD() {
     ctx.font = '13px Courier New';
     ctx.fillText('🔇 M', canvas.width - 10, canvas.height - 8);
   }
+}
+
+// Track whether any power-up is active (for paddle glow)
+let _powerUpActive = false;
+
+function activatePowerUpGlow() { _powerUpActive = true; }
+function clearPowerUpGlow()    { _powerUpActive = false; }
+
+function drawPaddleWithGlow(ctx, paddle) {
+  if (_powerUpActive) {
+    ctx.shadowColor = '#00ff88';
+    ctx.shadowBlur  = 18;
+  }
+  paddle.draw(ctx);
+  ctx.shadowBlur  = 0;
+  ctx.shadowColor = 'transparent';
 }
 
 function drawTitle() {
@@ -322,6 +350,28 @@ document.addEventListener('keydown', (e) => {
     game.state = STATES.TITLE;
   }
 });
+
+// Mobile touch controls
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (game.state === STATES.TITLE) {
+    game.sessionStart = Date.now();
+    game.bricksDestroyed = 0;
+    game.state = STATES.PLAYING;
+  } else if (game.state === STATES.PLAYING) {
+    balls.forEach(b => b.launch());
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (game.state !== STATES.PLAYING) return;
+  const rect  = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  const x     = (touch.clientX - rect.left) * (canvas.width / rect.width);
+  paddle.trackMouse(x);
+  balls.forEach(b => { if (!b.launched) b.x = paddle.x + paddle.width / 2; });
+}, { passive: false });
 
 requestAnimationFrame((ts) => {
   game.lastTime = ts;

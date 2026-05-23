@@ -25,6 +25,7 @@ This is a learning playground where each project lives in a numbered folder:
 15_simple_form/           # React dark-themed contact form (single HTML file)
 16_daily_challenge/       # Next.js 16 daily challenge generator (see below)
 17_kanban/                # Next.js 16 Kanban board with drag-and-drop (see below)
+19_arkanoid/              # Vanilla JS/HTML5 Canvas Arkanoid game (see below)
 ```
 
 New projects are prefixed with the next number and use underscores (not
@@ -133,6 +134,17 @@ npm run dev       # http://localhost:3000
 npm run test      # vitest unit tests
 npm run test:e2e  # playwright e2e (port 3003)
 ```
+
+### `19_arkanoid/`
+Vanilla JS + HTML5 Canvas Arkanoid/Breakout game. No build step — open
+`index.html` directly in any modern browser.
+- **Controls**: Mouse or ←/→ arrow keys / A/D for paddle; Space or click to
+  launch ball; P to pause; M to mute; H from title for progress history
+- **Features**: 5 levels, 4 power-ups (Expand/Multi-Ball/Extra Life/Slow),
+  Web Audio API synthesized sounds, particle effects, session history stored
+  in localStorage with personal best and trend detection
+- **ADRs**: `docs/adr/` — 5 architecture decision records documenting game
+  loop, physics model, brick grid, collision system, and history persistence
 
 ### `11_workout_dashboard/`
 React 18 + Vite + Tailwind CSS + Chart.js dashboard for Hevy gym app exports.
