@@ -27,16 +27,21 @@ const game = {
 };
 
 const paddle = new Paddle(canvas.width, canvas.height);
-const balls  = [new Ball(
-  canvas.width / 2,
-  paddle.y - 10,
-)];
+const balls  = [new Ball(canvas.width / 2, paddle.y - 10)];
+let bricks   = buildLevel(0);
 
 function activeBalls() { return balls.filter(b => !b.isLost(canvas.height)); }
 
 function resetBall() {
   balls.length = 0;
   balls.push(new Ball(paddle.x + paddle.width / 2, paddle.y - 10));
+}
+
+function startLevel(levelIndex) {
+  game.level = levelIndex + 1;
+  bricks = buildLevel(levelIndex);
+  balls.forEach(b => b.setSpeed(LEVEL_SPEEDS[levelIndex] ?? 7.2));
+  resetBall();
 }
 
 canvas.addEventListener('mousemove', (e) => {
@@ -84,6 +89,7 @@ function updatePlaying(dt) {
     return;
   }
 
+  bricks.forEach(b => b.draw(ctx));
   paddle.draw(ctx);
   balls.forEach(b => b.draw(ctx));
 }
