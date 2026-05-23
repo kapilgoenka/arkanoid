@@ -26,6 +26,26 @@ const game = {
   lastTime: 0,
 };
 
+const paddle = new Paddle(canvas.width, canvas.height);
+const balls  = [new Ball(
+  canvas.width / 2,
+  paddle.y - 10,
+)];
+
+function activeBalls() { return balls.filter(b => !b.isLost(canvas.height)); }
+
+function resetBall() {
+  balls.length = 0;
+  balls.push(new Ball(paddle.x + paddle.width / 2, paddle.y - 10));
+}
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  paddle.trackMouse(e.clientX - rect.left);
+  // Unlaunched ball tracks the paddle centre
+  balls.forEach(b => { if (!b.launched) b.x = paddle.x + paddle.width / 2; });
+});
+
 function gameLoop(timestamp) {
   const dt = Math.min(timestamp - game.lastTime, 50);
   game.lastTime = timestamp;
@@ -46,14 +66,26 @@ function gameLoop(timestamp) {
 }
 
 function updatePlaying(dt) {
-  // Populated in later issues — placeholder draw for scaffold
   ctx.fillStyle = '#111122';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = '#4444aa';
-  ctx.font = '16px Courier New';
-  ctx.textAlign = 'center';
-  ctx.fillText('Canvas ready — game loop running at 60 FPS', canvas.width / 2, canvas.height / 2);
+  paddle.update(dt);
+  balls.forEach(b => b.update(dt, canvas.width));
+
+  // Remove lost balls; lose a life when the last one exits
+  const alive = activeBalls();
+  if (alive.length === 0) {
+    game.lives -= 1;
+    if (game.lives <= 0) {
+      game.state = STATES.GAME_OVER;
+    } else {
+      resetBall();
+    }
+    return;
+  }
+
+  paddle.draw(ctx);
+  balls.forEach(b => b.draw(ctx));
 }
 
 function drawTitle() {
@@ -152,10 +184,19 @@ function drawHistory() {
   ctx.fillText('Press ESC to go back', canvas.width / 2, canvas.height - 40);
 }
 
+canvas.addEventListener('click', () => {
+  if (game.state === STATES.PLAYING) balls.forEach(b => b.launch());
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
-    if (game.state === STATES.TITLE) game.state = STATES.PLAYING;
-    else if (game.state === STATES.LEVEL_COMPLETE) game.state = STATES.PLAYING;
+    if (game.state === STATES.TITLE) {
+      game.state = STATES.PLAYING;
+    } else if (game.state === STATES.PLAYING) {
+      balls.forEach(b => b.launch());
+    } else if (game.state === STATES.LEVEL_COMPLETE) {
+      game.state = STATES.PLAYING;
+    }
   }
   if (e.code === 'KeyP' && game.state === STATES.PLAYING) {
     game.state = STATES.PAUSED;
@@ -167,6 +208,7 @@ document.addEventListener('keydown', (e) => {
     game.score = 0;
     game.lives = 3;
     game.level = 1;
+    resetBall();
     game.state = STATES.TITLE;
   }
   if (e.code === 'KeyH' && game.state === STATES.TITLE) {
